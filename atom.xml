@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Random]]></title>
+  <link href="http://dwalters.github.com/octopress/atom.xml" rel="self"/>
+  <link href="http://dwalters.github.com/octopress/"/>
+  <updated>2012-06-19T19:15:28-05:00</updated>
+  <id>http://dwalters.github.com/octopress/</id>
+  <author>
+    <name><![CDATA[Dan Walters]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Hacking Linksys EA3500 firmware for SSH access]]></title>
+    <link href="http://dwalters.github.com/octopress/blog/2012/06/19/hacking-linksys-ea3500-firmware-for-ssh-access/"/>
+    <updated>2012-06-19T17:37:00-05:00</updated>
+    <id>http://dwalters.github.com/octopress/blog/2012/06/19/hacking-linksys-ea3500-firmware-for-ssh-access</id>
+    <content type="html"><![CDATA[<p>So I recently upgraded to a <a href="http://homesupport.cisco.com/en-us/support/routers/EA3500">Linksys EA3500</a> router, deciding to retire my ol&#8217; trusty but very hackable <a href="http://homesupport.cisco.com/en-us/wireless/lbc/WRT160NL">Linksys WRT 160NL</a> for 2 very important, to me, reasons:</p>
+
+<ul>
+<li>I live in an apartment building and can generally see 20+ wireless networks, and performance often suffers due to the fact that there are only 3 channels in the 2.4GHz band that don&#8217;t overlap.  With 5Ghz, there are several more available channels, and nobody&#8217;s using them yet!  But I need the dual band support so that I can still use my 2.4GHz only <a href="http://www.apple.com/iphone/">iPhone 4S</a>.  All of my other devices support the 5GHz bands, no problem.</li>
+<li>The EA3500 has gigabit ethernet ports, as does my <a href="http://www.netgear.com/home/products/storage/prosumer/">ReadyNAS Duo</a>, where I have all my movies and music stored.  One day I noticed that I was transferring data to my <a href="http://www.apple.com/appletv/">AppleTV 2</a> quicker over 802.11 than over a network cable, and decided I really needed gigabit so I don&#8217;t spend all day copying movies to my NAS.</li>
+</ul>
+
+
+<p>I&#8217;ve been using <a href="http://openwrt.org">OpenWRT</a> for quite a while, and am pretty spoiled with respect to the configurability of my routers, so I started out seeing what I could do to my new EA3500.  It turned out, not much.  None of OpenWRT, <a href="http://www.dd-wrt.com">DD-WRT</a>, or <a href="http://www.polarcloud.com/tomato">Tomato</a> currently support it.</p>
+
+<p>A quick bit of googling led me to <a href="http://bramp.net/blog/2012/01/hacking-linksys-e4200v2-firmware/">Hacking Linksys E4200v2 firmware</a>, which is a very similar router, and plenty of discouraging posts about how it&#8217;s running a Marvell SoC which isn&#8217;t very community friendly and won&#8217;t be supported by the open source firmware community anytime soon.  Bummer.  The <a href="http://code.google.com/p/firmware-mod-kit/">Firmware Modificaiton Kit</a> used for a lot of older routers also doesn&#8217;t support the EA3500, at least out of the box.</p>
+
+<p>Starting from Brampton&#8217;s blog post, I was able to obtain the actual firmware image from Linksys&#8217;s servers using the same techniques, giving me <a href="http://download.linksys.com/updates/to0037158864.pdx/FW_EA3500_1.0.30.126544.SSA">FW_EA3500_1.0.30.126544.SSA</a>.  Analyzing this file, I&#8217;ve determined that it contains:</p>
+
+<ol>
+<li>A 64 byte legacy uImage bootloader header (offset 0)</li>
+<li>A kernel image (offset 0x40)</li>
+<li>A JFFS2 root filesystem image (offset 0x290000)</li>
+<li>A cryptographic signature (the last ~400 bytes of the file)</li>
+</ol>
+
+
+<p>Further analysis has led me to believe that the cryptographic signature is only verified for updated firmware images that are automatically downloaded by the device; those that are uploaded manually via the web interface will not be verified, and it should be possible to modify the root filesystem however you want, and proceed to flash it.  That said, until I have a working serial console, I&#8217;m hesitant to actually try it!</p>
+
+<p>I made a quickie script which splits out the SSA firmware file:</p>
+
+<div><script src='https://gist.github.com/2957075.js?file='></script>
+<noscript><pre><code>#!/usr/bin/env ruby
+#
+# Requires Ruby 1.9, and extracts the uImage header, kernel, and jffs root image from a stock
+# firmware.
+
+Encoding.default_external = &quot;binary&quot;
+
+FW_FILENAME = &quot;FW_EA3500_1.0.30.126544.SSA&quot;
+
+data = File.read(FW_FILENAME)
+
+fs_offset = data.index(&quot;\x00\x00\x85\x19&quot;.force_encoding(&quot;binary&quot;)) + 2
+puts &quot;found jffs2 root at offset 0x%x&quot; % [fs_offset]
+
+File.write(&quot;uImage.img&quot;, data[0, fs_offset])
+File.write(&quot;jffs2.rootfs.img&quot;, data[fs_offset..-1])
+</code></pre></noscript></div>
+
+
+<p>The resulting root image can be mounted and examined using the same techniques Brampton used.</p>
+
+<p>My first goal was to disable <a href="http://en.wikipedia.org/wiki/Wi-Fi_Protected_Setup">WPS</a> as I simply don&#8217;t trust it after some <a href="http://www.smallnetbuilder.com/wireless/wireless-features/31664-waiting-for-the-wps-fix">recent security issues</a>.  A quick grep of the root filesystem led me to believe that maybe I could just set <code>wl0_wps_state=disabled</code> and <code>wl1_wps_state=disabled</code> in nvram, so I set out to make those modifications.  Examination of the firmware led to the discovery of a simple structure for the nvram backups, which are DES encrypted with a hardcoded key before being downloaded by the client browser.  I wrote a script to decrypt and re-encrypt these backups, which allows for changing arbitrary nvram values with the stock firmware.</p>
+
+<div><script src='https://gist.github.com/2931407.js?file='></script>
+<noscript><pre><code>#!/usr/bin/env ruby
+#
+# Script to decrypt (and reencrypt) Linksys EA3500 v1.0 configuration file backups, e.g.,
+# Linksys_EA3500V1_v1.0.30.126544.cfg . The result of decryption is a plain text nvram dump that
+# can be edited, re-encrypted, and uploaded back into the router.
+#
+# Depends on Ruby 1.9 and an openssl command line binary.
+
+require 'optparse'
+require 'tempfile'
+require 'zlib'
+
+CFG_MAGIC = 0xfeeddade
+CFG_VERSION = 1
+CFG_DES_KEY = '2f8a36e8a92aa7b02f64ec77f85643de'
+
+def encrypt_config(config_file)
+    payload = File.read(config_file, :encoding =&gt; 'binary')
+    crc = Zlib::crc32(payload) ^ 0xffffffff
+    header = [CFG_MAGIC, payload.length, CFG_VERSION, crc].pack('L4')
+
+    temp_file = Tempfile.new 'config', :encoding =&gt; 'binary'
+    begin
+        temp_file.write(header + payload)
+        temp_file.close
+        system 'openssl', 'des', '-in', temp_file.path, '-out', config_file, '-e', '-k', CFG_DES_KEY or raise &quot;encryption failed&quot;
+    ensure
+        temp_file.unlink
+    end
+end
+
+def decrypt_config(config_file)
+    temp_file = Tempfile.new 'config', :encoding =&gt; 'binary'
+    data = begin
+        temp_file.close
+        system 'openssl', 'des', '-in', config_file, '-out', temp_file.path, '-d', '-k', CFG_DES_KEY or raise &quot;decryption failed&quot;
+        File.read(temp_file.path, :encoding =&gt; 'binary')
+    ensure
+        temp_file.unlink
+    end
+
+    header = data[0, 0x10].unpack('L4')
+    payload = data[0x10..-1]
+    raise &quot;incorrect magic&quot; unless header[0] == CFG_MAGIC
+    raise &quot;incorrect version&quot; unless header[2] == CFG_VERSION
+
+    File.write(config_file, payload, :encoding =&gt; 'binary')
+end
+
+options = {}
+OptionParser.new do |opts|
+    opts.banner = &quot;Usage: linksys-config.rb [options] linksys.cfg&quot;
+    opts.on(&quot;-e&quot;, &quot;--encrypt&quot;, &quot;Encrypt the given configuration.&quot;) do |e|
+        options[:encrypt] = e
+    end
+    opts.on(&quot;-d&quot;, &quot;--decrypt&quot;, &quot;Decrypt the given configuration.&quot;) do |d|
+        options[:decrypt] = d
+    end
+end.parse!
+
+config_file = ARGV.first
+raise &quot;configuration file does not exist: #{config_file}&quot; unless config_file &amp;&amp; File.exist?(config_file)
+raise &quot;must choose only one operation!&quot; if options[:encrypt] &amp;&amp; options[:decrypt]
+
+if options[:encrypt] then
+    encrypt_config(config_file)
+    puts &quot;#{config_file} successfully encrypted.&quot;
+elsif options[:decrypt]
+    decrypt_config(config_file)
+    puts &quot;#{config_file} successfully decrypted.&quot;
+else
+    raise &quot;must specify whether you wish to encrypt or decrypt the config file.&quot;
+end
+</code></pre></noscript></div>
+
+
+<p>Unfortunately, setting the <code>wl*_wps_state=disabled</code> variables didn&#8217;t work; it turns out whether to disable wps is a decision that is reevaluated based on several factors, but lucky for me, all you actually have to do is disable SSID broadcasting on your wireless networks and WPS is disabled as well.  I confirmed this with <code>iw wlan0 scan</code> in a <a href="http://www.backtrack-linux.org/">Backtrack VM</a>, and seeing that, indeed, WPS was no longer enabled.  No hacking required &#8230; just not exactly obvious!</p>
+
+<p>That said, I noticed while poking around that the EA3500 has special treatment for any USB mass storage device that is plugged in with a <code>packages</code> directory off the root.  The contents of this directory are automatically linked to <code>/opt</code>, and anything in the <code>/opt/etc/registration.d</code> directory is executed, init script style, to extend the functionality of the stock firmware.</p>
+
+<p>I should note that it&#8217;s <strong>extremely insecure</strong>, in that, at first glance, anybody with FTP access to the router could create files in these special directories that will later (after a reboot) be executed by the root user.  But for my purposes, I was happy to take advantage.</p>
+
+<p>I cross compiled the <a href="https://matt.ucc.asn.au/dropbear/dropbear.html">dropbear ssh server</a> for ARM, using the same toolchain - <a href="http://www.mentor.com/embedded-software/sourcery-tools/sourcery-codebench/editions/lite-edition/">CodeBench Lite Edition</a> - as was used by Cisco, and placed it in the appropriate directory structure on a USB flash drive.  Upon plugging in the flash drive, the SSH server was launched and I was able to login to the box as the root user (with the admin password for my router.)</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>└┌(%:~)┌- ssh root@gateway 
+</span><span class='line'>root@gateway's password: 
+</span><span class='line'>~ # id
+</span><span class='line'>uid=0(root) gid=0 groups=0
+</span><span class='line'>~ # uname -a
+</span><span class='line'>Linux gateway 2.6.35.8 #1 Fri Dec 23 17:46:50 PST 2011 armv5tel GNU/Linux
+</span><span class='line'>~ # cat /proc/cpuinfo 
+</span><span class='line'>Processor   : Feroceon 88FR131 rev 1 (v5l)
+</span><span class='line'>BogoMIPS    : 799.53
+</span><span class='line'>Features    : swp half thumb fastmult edsp 
+</span><span class='line'>CPU implementer : 0x56
+</span><span class='line'>CPU architecture: 5TE
+</span><span class='line'>CPU variant : 0x2
+</span><span class='line'>CPU part    : 0x131
+</span><span class='line'>CPU revision    : 1
+</span><span class='line'>
+</span><span class='line'>Hardware    : Feroceon-KW
+</span><span class='line'>Revision    : 0000
+</span><span class='line'>Serial      : 0000000000000000
+</span><span class='line'>~ # cat /proc/version 
+</span><span class='line'>Linux version 2.6.35.8 (root@ubuntu) (gcc version 4.2.0 20070413 (prerelease) (CodeSourcery Sourcery G++ Lite 2007q1-21)) #1 Fri Dec 23 17:46:50 PST 2011</span></code></pre></td></tr></table></div></figure>
+
+
+<p>I&#8217;m making available an <a href="files/packages.zip">archive</a> of the dropbear binaries and corresponding init script, for anyone else who wishes to get ssh access to their device.  Permissions don&#8217;t matter much.  I just extracted it in the root of a normal FAT32 filesystem, but it looks like HFS or even ext2 should work.  I also image the same archive will work with an E4200, but havn&#8217;t tested it.</p>
+
+<p>At this point, the only other thing I really want to accomplish is Tomato stlye QoS rules (I love the &#8220;any TCP connection with more than x kB of downloaded data shall be lower priority rule), but with shell access it shouldn&#8217;t be a problem, and I didn&#8217;t even need to risk flashing a custom firmware!</p>
+]]></content>
+  </entry>
+  
+</feed>
