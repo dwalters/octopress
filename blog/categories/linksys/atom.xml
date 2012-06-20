@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: linksys | Random]]></title>
-  <link href="http://dwalters.github.com/octopress/blog/categories/linksys/atom.xml" rel="self"/>
-  <link href="http://dwalters.github.com/octopress/"/>
-  <updated>2012-06-19T19:24:31-05:00</updated>
-  <id>http://dwalters.github.com/octopress/</id>
+  <link href="http://blog.danwalters.net/blog/categories/linksys/atom.xml" rel="self"/>
+  <link href="http://blog.danwalters.net/"/>
+  <updated>2012-06-19T19:26:14-05:00</updated>
+  <id>http://blog.danwalters.net/</id>
   <author>
     <name><![CDATA[Dan Walters]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[Hacking Linksys EA3500 firmware for SSH access]]></title>
-    <link href="http://dwalters.github.com/octopress/blog/2012/06/19/hacking-linksys-ea3500-firmware-for-ssh-access/"/>
+    <link href="http://blog.danwalters.net/blog/2012/06/19/hacking-linksys-ea3500-firmware-for-ssh-access/"/>
     <updated>2012-06-19T17:37:00-05:00</updated>
-    <id>http://dwalters.github.com/octopress/blog/2012/06/19/hacking-linksys-ea3500-firmware-for-ssh-access</id>
+    <id>http://blog.danwalters.net/blog/2012/06/19/hacking-linksys-ea3500-firmware-for-ssh-access</id>
     <content type="html"><![CDATA[<p>So I recently upgraded to a <a href="http://homesupport.cisco.com/en-us/support/routers/EA3500">Linksys EA3500</a> router, deciding to retire my ol' trusty but very hackable <a href="http://homesupport.cisco.com/en-us/wireless/lbc/WRT160NL">Linksys WRT 160NL</a> for 2 very important, to me, reasons:</p>
 
 <ul>

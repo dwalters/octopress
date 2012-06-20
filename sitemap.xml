@@ -2,16 +2,16 @@
 <urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>
     <url>
         <loc>
-            http://dwalters.github.com/octopress/blog/2012/06/19/hacking-linksys-ea3500-firmware-for-ssh-access/
+            http://blog.danwalters.net/blog/2012/06/19/hacking-linksys-ea3500-firmware-for-ssh-access/
         </loc>
         <lastmod>2012-06-19T19:00:40-05:00</lastmod>
     </url>
     <url>
-        <loc>http://dwalters.github.com/octopress/blog/archives/</loc>
+        <loc>http://blog.danwalters.net/blog/archives/</loc>
         <lastmod>2012-06-19T19:00:40-05:00</lastmod>
     </url>
     <url>
-        <loc>http://dwalters.github.com/octopress/</loc>
+        <loc>http://blog.danwalters.net/</loc>
         <lastmod>2012-06-19T19:00:40-05:00</lastmod>
     </url>
 </urlset>
