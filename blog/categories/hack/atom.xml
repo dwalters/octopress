@@ -4,7 +4,7 @@
   <title><![CDATA[Category: hack | Random]]></title>
   <link href="http://blog.danwalters.net/blog/categories/hack/atom.xml" rel="self"/>
   <link href="http://blog.danwalters.net/"/>
-  <updated>2012-06-20T11:07:18-05:00</updated>
+  <updated>2012-06-20T11:32:28-05:00</updated>
   <id>http://blog.danwalters.net/</id>
   <author>
     <name><![CDATA[Dan Walters]]></name>
@@ -27,6 +27,8 @@
 
 
 <p>I've been using <a href="http://openwrt.org">OpenWRT</a> for quite a while, and am pretty spoiled with respect to the configurability of my routers, so I started out seeing what I could do to my new EA3500.  It turned out, not much.  None of OpenWRT, <a href="http://www.dd-wrt.com">DD-WRT</a>, or <a href="http://www.polarcloud.com/tomato">Tomato</a> currently support it.</p>
+
+<h3>Getting and Analyzing the Firmware</h3>
 
 <p>A quick bit of googling led me to <a href="http://bramp.net/blog/2012/01/hacking-linksys-e4200v2-firmware/">Hacking Linksys E4200v2 firmware</a>, which is a very similar router, and plenty of discouraging posts about how it's running a Marvell SoC which isn't very community friendly and won't be supported by the open source firmware community anytime soon.  Bummer.  The <a href="http://code.google.com/p/firmware-mod-kit/">Firmware Modificaiton Kit</a> used for a lot of older routers also doesn't support the EA3500, at least out of the box.</p>
 
@@ -65,6 +67,8 @@ File.write(&quot;jffs2.rootfs.img&quot;, data[fs_offset..-1])
 </p>
 
 <p>The resulting root image can be mounted and examined using the same techniques Brampton used.</p>
+
+<h3>Disabling WPS</h3>
 
 <p>My first goal was to disable <a href="http://en.wikipedia.org/wiki/Wi-Fi_Protected_Setup">WPS</a> as I simply don't trust it after some <a href="http://www.smallnetbuilder.com/wireless/wireless-features/31664-waiting-for-the-wps-fix">recent security issues</a>.  A quick grep of the root filesystem led me to believe that maybe I could just set <code>wl0_wps_state=disabled</code> and <code>wl1_wps_state=disabled</code> in nvram, so I set out to make those modifications.  Examination of the firmware led to the discovery of a simple structure for the nvram backups, which are DES encrypted with a hardcoded key before being downloaded by the client browser.  I wrote a script to decrypt and re-encrypt these backups, which allows for changing arbitrary nvram values with the stock firmware.</p>
 
@@ -145,11 +149,13 @@ end
 </code></pre></noscript></div>
 </p>
 
-<p>Unfortunately, setting the <code>wl*_wps_state=disabled</code> variables didn't work; it turns out whether to disable wps is a decision that is reevaluated based on several factors, but lucky for me, all you actually have to do is disable SSID broadcasting on your wireless networks and WPS is disabled as well.  I confirmed this with <code>iw wlan0 scan</code> in a <a href="http://www.backtrack-linux.org/">Backtrack VM</a>, and seeing that, indeed, WPS was no longer enabled.  No hacking required ... just not exactly obvious!</p>
+<p>Unfortunately, setting the <code>wl*_wps_state=disabled</code> variables didn't work; it turns out whether to disable wps is a decision that is reevaluated based on several factors, but lucky for me, all you actually have to do is disable SSID broadcasting on your wireless networks and WPS will be disabled as well.  I confirmed this with <code>iw wlan0 scan</code> in a <a href="http://www.backtrack-linux.org/">Backtrack VM</a>, and seeing that, indeed, WPS was no longer enabled.  No hacking required ... just not exactly obvious!</p>
 
-<p>That said, I noticed while poking around that the EA3500 has special treatment for any USB mass storage device that is plugged in with a <code>packages</code> directory off the root.  The contents of this directory are automatically linked to <code>/opt</code>, and anything in the <code>/opt/etc/registration.d</code> directory is executed, init script style, to extend the functionality of the stock firmware.</p>
+<h3>SSH Access</h3>
 
-<p>I should note that it's <strong>extremely insecure</strong>, in that, at first glance, anybody with FTP access to the router could create files in these special directories that will later (after a reboot) be executed by the root user.  But for my purposes, I was happy to take advantage.</p>
+<p>I noticed while poking around the root filesystem that the EA3500 has special treatment for any USB mass storage device that is plugged in with a <code>packages</code> directory off the root.  The contents of this directory are automatically linked to <code>/opt</code>, and anything in the <code>/opt/etc/registration.d</code> directory is executed, init script style, to extend the functionality of the stock firmware.</p>
+
+<p>I should note that this could be a security hole, in that, at first glance, anybody with FTP access to the router could create files in these special directories that will later (after a reboot) be executed by the root user.  But for my purposes, I was happy to take advantage.</p>
 
 <p>I cross compiled the <a href="https://matt.ucc.asn.au/dropbear/dropbear.html">dropbear ssh server</a> for ARM, using the same toolchain - <a href="http://www.mentor.com/embedded-software/sourcery-tools/sourcery-codebench/editions/lite-edition/">CodeBench Lite Edition</a> - as was used by Cisco, and placed it in the appropriate directory structure on a USB flash drive.  Upon plugging in the flash drive, the SSH server was launched and I was able to login to the box as the root user (with the admin password for my router.)</p>
 
@@ -177,9 +183,13 @@ Serial      : 0000000000000000
 Linux version 2.6.35.8 (root@ubuntu) (gcc version 4.2.0 20070413 (prerelease) (CodeSourcery Sourcery G++ Lite 2007q1-21)) #1 Fri Dec 23 17:46:50 PST 2011
 ```</p>
 
-<p>I'm making available an <a href="files/packages.zip">archive</a> of the dropbear binaries and corresponding init script, for anyone else who wishes to get ssh access to their device.  Permissions don't matter much.  I just extracted it in the root of a normal FAT32 filesystem, but it looks like HFS or even ext2 should work.  I also image the same archive will work with an E4200, but havn't tested it.</p>
+<p>I'm making available an <a href="files/linksys-ea3500-dropbear.zip">archive</a> of the dropbear binaries and corresponding init script, for anyone else who wishes to get ssh access to their device.  Permissions don't matter much.  I just extracted it in the root of a normal FAT32 filesystem, but it looks like HFS or even ext2 should work.  I also image the same archive will work with an E4200, but havn't tested it.</p>
 
-<p>At this point, the only other thing I really want to accomplish is Tomato stlye QoS rules (I love the "any TCP connection with more than x kB of downloaded data shall be lower priority rule), but with shell access it shouldn't be a problem, and I didn't even need to risk flashing a custom firmware!</p>
+<h3>What's Left</h3>
+
+<p>At this point, the only other thing I really want to accomplish is Tomato style QoS rules (I love the "any TCP connection with more than x kB of downloaded data shall be lower priority" rule), but with shell access it shouldn't be a problem, and I didn't even need to risk flashing a custom firmware!</p>
+
+<p>It seems that, to run OpenWRT or something similar, the wireless driver is the big blocker, but it's available as a binary kernel module (<code>ap8x.o</code>) in the root filesystem.  The open source <a href="http://linuxwireless.org/en/users/Drivers/mwl8k">mwl8k</a> driver, however, says that it currently supports the 88W8366 chipset, which <a href="http://www.techinfodepot.info/index.php/Linksys_EA3500">appears to be the EA3500 chipset</a>, so maybe support isn't as far off as one would think.</p>
 ]]></content>
   </entry>
   
