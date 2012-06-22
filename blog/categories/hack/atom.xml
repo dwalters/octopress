@@ -4,7 +4,7 @@
   <title><![CDATA[Category: hack | Random]]></title>
   <link href="http://blog.danwalters.net/blog/categories/hack/atom.xml" rel="self"/>
   <link href="http://blog.danwalters.net/"/>
-  <updated>2012-06-21T15:28:26-05:00</updated>
+  <updated>2012-06-22T07:22:06-05:00</updated>
   <id>http://blog.danwalters.net/</id>
   <author>
     <name><![CDATA[Dan Walters]]></name>
@@ -183,7 +183,7 @@ Serial      : 0000000000000000
 Linux version 2.6.35.8 (root@ubuntu) (gcc version 4.2.0 20070413 (prerelease) (CodeSourcery Sourcery G++ Lite 2007q1-21)) #1 Fri Dec 23 17:46:50 PST 2011
 ```</p>
 
-<p>I'm making available an <a href="files/linksys-ea3500-dropbear.zip">archive</a> of the dropbear binaries and corresponding init script, for anyone else who wishes to get ssh access to their device.  Permissions don't matter much.  I just extracted it in the root of a normal FAT32 filesystem, but it looks like HFS or even ext2 should work.  I also imagine the same archive will work with an E4200, but havn't tested it.</p>
+<p>I'm making available an <a href="/files/linksys-ea3500-dropbear.zip">archive</a> of the dropbear binaries and corresponding init script, for anyone else who wishes to get ssh access to their device.  Permissions don't matter much.  I just extracted it in the root of a normal FAT32 filesystem, but it looks like HFS or even ext2 should work.  I also imagine the same archive will work with an E4200, but havn't tested it.</p>
 
 <h3>What's Left</h3>
 
